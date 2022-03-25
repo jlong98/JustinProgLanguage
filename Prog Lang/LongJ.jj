@@ -1,0 +1,229 @@
+/* JavaCC input file for a simple imperative language. */
+PARSER_BEGIN(LongJ)
+
+        import java.io.*;
+        import java.util.HashMap;
+        import java.util.Scanner;
+
+        class LongJ {
+                public static HashMap<String, Integer> ram = new HashMap<String, Integer>();
+                public static Scanner scan = new Scanner(System.in);
+
+                public static void main(String[] args) throws ParseException, TokenMgrError {
+                        if(args.length > 0) {
+                                try{
+                                        LongJ scan = new LongJ(new FileInputStream(args[0]));
+                                        Node root = scan.Program();
+                                        root.eval();
+                                } catch (FileNotFoundException ex) {
+                                        System.out.println("File "+args[0]+" not found.");
+                                }
+                        }else {
+                                System.out.println("Must specify source code file name.");
+                        }
+                }
+        }
+PARSER_END(LongJ)
+
+        SKIP : { " " | "\t" | "\n" }
+        TOKEN : { <INPUT : "holster"> }
+        TOKEN : { <LOOP : "repeater"> }
+        TOKEN : { <END : "end"> }
+        TOKEN : { <IF : "if"> }
+        TOKEN : { <ELSE : "else"> }
+        TOKEN : { <ASSIGN : "<-"> }
+        TOKEN : { <INT : "0" | ["1"-"9"] (["0"-"9"]) *> }
+        TOKEN : { <OUTPUT : "draw"> }
+        TOKEN : { <LPAREN : "("> }
+        TOKEN : { <RPAREN : ")"> }
+        TOKEN : { <DOT : "."> }
+        TOKEN : { <ID : (["a"-"z", "A"-"Z"]) +> }
+        TOKEN : { <AOP : "+" | "-"> }
+        TOKEN : { <MOP : "*" | "/" | "%"> }
+        TOKEN : { <RELOP : "<" | ">" | "<=" | ">=" | "!=" | "=="> }
+
+        Node Program():
+        {
+        Node n;
+        Node c;
+        }
+        {
+                {n = new BlockNode();}
+                (
+                        c = Input()     {n.addChild(c);}
+                        |
+                        c = Output()    {n.addChild(c);}
+                        |
+                        c = Assign()    {n.addChild(c);}
+                        |
+                        c = Loop()      {n.addChild(c);}
+                        |
+                        c = IfElse()    {n.addChild(c);}
+                )+
+                <EOF>
+                {return n;}
+        }
+
+        Node Block():
+        {
+        Node n;
+        Node c;
+        }
+        {
+                {n = new BlockNode(); }
+                (
+                        c = Input()     {n.addChild(c); }
+                        |
+                        c = Output()    {n.addChild(c); }
+                        |
+                        c = Assign()    {n.addChild(c); }
+                        |
+                        c = Loop()      {n.addChild(c); }
+                        |
+                        c = IfElse()    {n.addChild(c); }
+                )+
+                {return n;}
+        }
+
+        Node Input():
+        {
+        Node n;
+        Token t;
+        }
+        {
+                {n = new InputNode();}
+                <INPUT>
+                t=<ID>          {n.addChild(new VarNode(t.image));}
+                <DOT>
+                {return n;}
+        }
+
+        Node Output():
+        {
+        Node n;
+        Token t;
+        }
+        {
+                {n = new OutputNode();}
+                <OUTPUT>
+                <LPAREN>
+                (
+                        t = <ID>        {n.addChild(new VarNode(t.image));}
+                        |
+                        t = <INT>       {n.addChild(new IntNode(t.image));}
+                )
+                <RPAREN>
+                <DOT>
+                {return n;}
+        }
+
+        Node Assign():
+        {
+        Node n;
+        Node c;
+        Token t;
+        }
+        {
+                {n=new AssignNode(); }
+                t=<ID>  {n.addChild(new VarNode(t.image));}
+                <ASSIGN>
+                c=Exp() {n.addChild(c); }
+                <DOT>
+                {return n;}
+        }
+
+        Node Exp():
+        {
+        Node n;
+        Token t;
+        Node c;
+        }
+        {
+                {n = new ExpNode(); }
+                c = Product()           {n.addChild(c);}
+                (
+                        (
+                                t = <AOP>       {n.addChild(new OpNode(t.image));}
+                        )
+                        c = Product()   {n.addChild(c);}
+                )*
+                {return n; }
+        }
+
+
+        Node Product():
+        {
+        Node n;
+        Node c;
+        Token t;
+        }
+        {
+                {n = new ExpNode(); }
+                c = Factor()            {n.addChild(c);}
+                (
+                        t = <MOP>       {n.addChild(new OpNode(t.image)); }
+                        c = Factor()    {n.addChild(c); }
+                )*
+                {return n; }
+        }
+
+        Node Factor():
+        {
+        Token t;
+        }
+        {
+                t = <ID>        {return new VarNode(t.image); }
+                |
+                t = <INT>       {return new IntNode(t.image); }
+        }
+
+        Node Rel():
+        {
+        Token t;
+        Node n;
+        Node c;
+        }
+        {
+                {n = new RelNode(); }
+                c = Exp()       {n.addChild(c); }
+                t = <RELOP>     {n.addChild(new RelopNode(t.image)); }
+                c = Exp()       {n.addChild(c); }
+                {return n; }
+        }
+
+        Node Loop():
+        {
+        Node n;
+        Node c;
+        }
+        {
+                {n = new LoopNode(); }
+                <LOOP>
+                <LPAREN>
+                c = Rel()       {n.addChild(c); }
+                <RPAREN>
+                c = Block()     {n.addChild(c); }
+                <END>
+                {return n; }
+        }
+
+        Node IfElse():
+        {
+        Node n;
+        Node c;
+        }
+        {
+                {n = new IfElseNode(); }
+                <IF>
+                <LPAREN>
+                c = Rel()       {n.addChild(c); }
+                <RPAREN>
+                c = Block()     {n.addChild(c); }
+                (
+                        <ELSE>
+                        c = Block()     {n.addChild(c); }
+                )+
+                <END>
+                {return n; }
+        }
+
